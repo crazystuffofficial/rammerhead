@@ -3,21 +3,6 @@ const fs = require('fs');
 const os = require('os');
 const RammerheadJSMemCache = require('./classes/RammerheadJSMemCache.js');
 const RammerheadJSFileCache = require('./classes/RammerheadJSFileCache.js');
-const http = require('http');
-
-function checkWebsiteExists(url, callback) {
-    http.get(url, (res) => {
-        // Check if the status code is in the 2xx range (success)
-        if (res.statusCode >= 200 && res.statusCode < 300) {
-            callback(true);
-        } else {
-            callback(false);
-        }
-    }).on('error', (err) => {
-        // If an error occurs, assume the website does not exist
-        callback(false);
-    });
-}
 const enableWorkers = os.cpus().length !== 1;
 
 module.exports = {
@@ -42,11 +27,9 @@ module.exports = {
     // getServerInfo: () => ({ hostname: 'localhost', port: 8080, crossDomainPort: 8081, protocol: 'http:' }),
     // example of non-hard-coding the hostname header
     getServerInfo: (req) => {
-        const websiteUrl = 'http://' + req.headers.host + ':8080';
-        checkWebsiteExists(websiteUrl, (exists) => {
-            if (exists) {
+            if (req.headers.host.includes(':8080')) {
                 return {
-                    hostname: req.headers.host,
+                    hostname: req.headers.host.replace(":8080", ""),
                     port: 8080,
                     crossDomainPort: 8081,
                     protocol: 'https:'
@@ -59,7 +42,6 @@ module.exports = {
                     protocol: 'https:'
                 };
             }
-        });
     },
 
     // enforce a password for creating new sessions. set to null to disable
