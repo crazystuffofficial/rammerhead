@@ -3,7 +3,21 @@ const fs = require('fs');
 const os = require('os');
 const RammerheadJSMemCache = require('./classes/RammerheadJSMemCache.js');
 const RammerheadJSFileCache = require('./classes/RammerheadJSFileCache.js');
+const http = require('http');
 
+function checkWebsiteExists(url, callback) {
+    http.get(url, (res) => {
+        // Check if the status code is in the 2xx range (success)
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+            callback(true);
+        } else {
+            callback(false);
+        }
+    }).on('error', (err) => {
+        // If an error occurs, assume the website does not exist
+        callback(false);
+    });
+}
 const enableWorkers = os.cpus().length !== 1;
 
 module.exports = {
@@ -25,11 +39,28 @@ module.exports = {
     // this function's return object will determine how the client url rewriting will work.
     // set them differently from bindingAddress and port if rammerhead is being served
     // from a reverse proxy.
-    getServerInfo: () => ({ hostname: 'localhost', port: 8080, crossDomainPort: 8081, protocol: 'http:' }),
+    // getServerInfo: () => ({ hostname: 'localhost', port: 8080, crossDomainPort: 8081, protocol: 'http:' }),
     // example of non-hard-coding the hostname header
-    // getServerInfo: (req) => {
-    //     return { hostname: new URL('http://' + req.headers.host).hostname, port: 443, crossDomainPort: 8443, protocol: 'https: };
-    // },
+    getServerInfo: (req) => {
+        const websiteUrl = 'http://' + req.headers.host + ':8080';
+        checkWebsiteExists(websiteUrl, (exists) => {
+            if (exists) {
+                return {
+                    hostname: req.headers.host,
+                    port: 8080,
+                    crossDomainPort: 8081,
+                    protocol: 'https:'
+                };
+            } else {
+                return {
+                    hostname: req.headers.host,
+                    port: 443,
+                    crossDomainPort: 8443,
+                    protocol: 'https:'
+                };
+            }
+        });
+    },
 
     // enforce a password for creating new sessions. set to null to disable
     password: 'sharkie4life',
@@ -43,7 +74,12 @@ module.exports = {
     // caching options for js rewrites. (disk caching not recommended for slow HDD disks)
     // recommended: 50mb for memory, 5gb for disk
     // jsCache: new RammerheadJSMemCache(5 * 1024 * 1024),
-    jsCache: new RammerheadJSFileCache(path.join(__dirname, '../cache-js'), 5 * 1024 * 1024 * 1024, 50000, enableWorkers),
+    jsCache: new RammerheadJSFileCache(
+        path.join(__dirname, '../cache-js'),
+        5 * 1024 * 1024 * 1024,
+        50000,
+        enableWorkers
+    ),
 
     // whether to disable http2 support or not (from proxy to destination site).
     // disabling may reduce number of errors/memory, but also risk
@@ -79,7 +115,7 @@ module.exports = {
             staleCheckInterval: 1000 * 60 * 60 * 6 // 6 hours
         },
         // corrupted session files happens when nodejs exits abruptly while serializing the JSON sessions to disk
-        deleteCorruptedSessions: true,
+        deleteCorruptedSessions: true
     },
 
     //// LOGGING CONFIGURATION ////
